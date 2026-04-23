@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Invoice</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f5f5f5;
+        padding: 30px;
+    }
+
+    .invoice-container {
+        background: #fff;
+        padding: 40px;
+        max-width: 800px;
+        margin: auto;
+        border: 1px solid #ddd;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .header h1 {
+        margin: 0;
+        letter-spacing: 2px;
+    }
+
+    .logo {
+        width: 80px;
+        height: 80px;
+        background: purple;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+
+    .top-info {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .section {
+        width: 48%;
+    }
+
+    .section h4 {
+        margin-bottom: 5px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 30px;
+    }
+
+    table, th, td {
+        border: 1px solid #999;
+    }
+
+    th, td {
+        padding: 10px;
+        text-align: left;
+    }
+
+    th {
+        background: #f0f0f0;
+    }
+
+    .right {
+        text-align: right;
+    }
+
+    .summary {
+        width: 300px;
+        margin-left: auto;
+        margin-top: 20px;
+        border: 1px solid #999;
+    }
+
+    .summary div {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        border-bottom: 1px solid #999;
+    }
+
+    .summary div:last-child {
+        border-bottom: none;
+        font-weight: bold;
+    }
+
+    .footer {
+        margin-top: 50px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .notes {
+        margin-top: 20px;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="invoice-container">
+
+    <div class="header">
+        <h1>INVOICE</h1>
+        <div class="logo">LOGO</div>
+    </div>
+
+    <p><strong>Invoice Number:</strong> #123456</p>
+    <p><strong>Invoice Date:</strong> 24/05/2030</p>
+
+    <div class="top-info">
+        <div class="section">
+            <h4>STUDIO SHOWDE</h4>
+            <p>123 Anywhere St., Any City, ST 12345</p>
+            <p>+123-456-7890</p>
+            <p>hello@reallygreatsite.com</p>
+        </div>
+
+        <div class="section">
+            <h4>BILL TO</h4>
+            <p>Rachael Beaudry</p>
+            <p>123 Anywhere St., Any City, ST 12345</p>
+            <p>+123-456-7890</p>
+            <p>hello@reallygreatsite.com</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Item & Description</th>
+                <th>Unit Price</th>
+                <th>Qty</th>
+                <th class="right">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Service 1</td>
+                <td>$100.00</td>
+                <td>1</td>
+                <td class="right">$100.00</td>
+            </tr>
+            <tr>
+                <td>Service 2</td>
+                <td>$150.00</td>
+                <td>1</td>
+                <td class="right">$150.00</td>
+            </tr>
+            <tr>
+                <td>Service 3</td>
+                <td>$200.00</td>
+                <td>1</td>
+                <td class="right">$200.00</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="notes">
+        <strong>NOTES / TERMS:</strong>
+        <p>Payment is due within 15 days of receiving this invoice.</p>
+    </div>
+
+    <div class="summary">
+        <div>
+            <span>Sub-Total</span>
+            <span>$450.00</span>
+        </div>
+        <div>
+            <span>Tax (6%)</span>
+            <span>$36.00</span>
+        </div>
+        <div>
+            <span>Total</span>
+            <span>$486.00</span>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div>
+            <strong>PAYMENT METHOD</strong>
+            <p>Bank: Borcelle Bank</p>
+            <p>Account Name: Studio Showde</p>
+            <p>Account Number: 1234567890</p>
+        </div>
+
+        <div>
+            <strong>PREPARED BY</strong>
+            <p>Benjamin Shah</p>
+            <p>Sales Administrator, Studio Showde</p>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QR Payment</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #eeeeee;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .card {
+        width: 320px;
+        margin: 50px auto;
+        background: #ffffff;
+        padding: 30px 25px;
+        text-align: center;
+        box-shadow: 0 0 0 1px #e0e0e0;
+    }
+
+    .logo {
+        font-size: 36px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .logo span {
+        color: #34a853; /* Google green */
+    }
+
+    .subtitle {
+        font-size: 13px;
+        color: #777;
+        margin-bottom: 25px;
+    }
+
+    .divider {
+        height: 1px;
+        background: #e5e5e5;
+        margin: 20px 0;
+    }
+
+    .business-name {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .phone {
+        font-size: 14px;
+        color: #555;
+        margin-bottom: 20px;
+    }
+
+    .qr {
+        width: 200px;
+        height: 200px;
+        margin: 0 auto 15px;
+        border: 8px solid #fff;
+        box-shadow: 0 0 0 1px #ddd;
+    }
+
+    .upi-id {
+        font-size: 13px;
+        color: #666;
+        letter-spacing: 0.5px;
+    }
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+    <div class="logo">
+        <span>G</span>Pay
+    </div>
+
+    <div class="subtitle">
+        LogoHere<br>
+        accepted here
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="business-name">Your Business Name</div>
+    <div class="phone">+91 12345 67890</div>
+
+    <!-- Replace src with your QR image -->
+    <img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay" alt="QR Code">
+
+    <div class="upi-id">12345 67890@ybl</div>
+
+</div>
+
+</body>
+</html>
