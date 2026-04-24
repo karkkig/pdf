@@ -27,7 +27,7 @@
     }
 
     .logo span {
-        color: #34a853; /* Google green */
+        color: #34a853;
     }
 
     .subtitle {
@@ -67,7 +67,6 @@
         color: #666;
         letter-spacing: 0.5px;
     }
-
 </style>
 </head>
 
@@ -86,13 +85,12 @@
 
     <div class="divider"></div>
 
-    <div class="business-name">Your Business Name</div>
-    <div class="phone">+91 12345 67890</div>
+    <div class="business-name">{{.BusinessName}}</div>
+    <div class="phone">{{.PhoneNumber}}</div>
 
-    <!-- Replace src with your QR image -->
-    <img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay" alt="QR Code">
+    <img class="qr" src="{{.QRURL}}" alt="QR Code">
 
-    <div class="upi-id">12345 67890@ybl</div>
+    <div class="upi-id">{{.UPIHandle}}</div>
 
 </div>
 

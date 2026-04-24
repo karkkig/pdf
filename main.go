@@ -15,33 +15,113 @@ func main() {
 
 	os.MkdirAll("output", os.ModePerm)
 
+	cdinvoiceData := cdpdf.InvoiceData{
+		Number: "123456",
+		Date:   time.Date(2030, 5, 24, 0, 0, 0, 0, time.UTC),
+		Provider: cdpdf.PartyInfo{
+			Name:    "STUDIO SHODWE",
+			Address: "123 Anywhere St., Any City",
+			City:    "ST 12345",
+			Phone:   "+123-456-7890",
+			Email:   "hello@reallygreatsite.com",
+		},
+		Client: cdpdf.PartyInfo{
+			Name:    "Rachel Beaudry",
+			Address: "123 Anywhere St., Any City",
+			City:    "ST 12345",
+			Phone:   "+123-456-7890",
+			Email:   "hello@reallygreatsite.com",
+		},
+		Items: []cdpdf.InvoiceItem{
+			{"Service 1", 100.00, 1},
+			{"Service 2", 150.00, 1},
+			{"Service 3", 200.00, 1},
+		},
+		TaxRate: 0.06,
+		Notes:   "Payment is due within 15 days\nof receiving this invoice.",
+		PaymentMethod: cdpdf.PaymentInfo{
+			Bank:          "Borcelle Bank",
+			AccountName:   "Studio Shodwe",
+			AccountNumber: "1234567890",
+		},
+		PreparedBy: cdpdf.PreparedByInfo{
+			Name:  "Benjamin Shah",
+			Title: "Sales Administrator, Studio Shodwe",
+		},
+	}
+
+	cdbadgeData := cdpdf.GPayBadgeData{
+		BusinessName: "Your Business Name",
+		PhoneNumber:  "+91 12345 67890",
+		UPIHandle:    "12345 67890@yhh",
+		QRContent:    "upi://pay?pa=1234567890@yhh&pn=Your+Business+Name&cu=INR",
+	}
+
+	cdfullAgreement := cdpdf.FullAgreementData{
+		AgreementData: cdpdf.AgreementData{
+			State:           "California",
+			Day:             "1st",
+			Month:           "January",
+			Year:            "25",
+			ProviderName:    "Acme Services Inc.",
+			ProviderAddress: "123 Main Street, Los Angeles, CA 90001",
+			BuyerName:       "Globex Corp.",
+			BuyerAddress:    "456 Market Street, San Francisco, CA 94105",
+			Services: []cdpdf.ServiceItem{
+				{"Web Development", "2", "5,000"},
+				{"UI/UX Design", "1", "3,000"},
+				{"SEO Package", "3", "1,200"},
+				{"Maintenance (monthly)", "6", "800"},
+			},
+			PurchasePrice: "20,000",
+			Notes:         "All work will be delivered digitally. Revisions are limited to 3 rounds per project.",
+		},
+		PaymentPlanData: cdpdf.PaymentPlanData{
+			Payer:           "John Doe",
+			Payee:           "Jane Smith",
+			Product:         "Web Development Services",
+			AmountPerPeriod: "$500",
+			Interval:        "month",
+			TotalAmount:     "$3,000",
+			Payments: []cdpdf.PaymentEntry{
+				{"1 Feb 2025", "$500"},
+				{"1 Mar 2025", "$500"},
+				{"1 Apr 2025", "$500"},
+				{"1 May 2025", "$500"},
+				{"1 Jun 2025", "$500"},
+				{"1 Jul 2025", "$500"},
+			},
+			LateFee:         "$50",
+			BounceFee:       "$75",
+			LenderAction:    "contact a debt collection service",
+			TermsConditions: "No refunds after work commencement. Disputes subject to California jurisdiction.",
+		},
+	}
+
 	fmt.Println("Generating chromedp PDF...")
 
-	invoiceHTML, err := cdpdf.ReadHTML("chromedp/template/invoice.html")
+	invoiceHTML, err := cdpdf.RenderHTMLTemplate("chromedp/template/invoice.html", cdinvoiceData)
 	if err != nil {
-		panic(err)
+		log.Fatal("chromedp invoice template:", err)
 	}
-	err = cdpdf.GeneratePDF(invoiceHTML, "output/invoice-chromedp.pdf")
-	if err != nil {
-		panic(err)
-	}
-
-	badgeHTML, err := cdpdf.ReadHTML("chromedp/template/badge.html")
-	if err != nil {
-		panic(err)
-	}
-	err = cdpdf.GeneratePDF(badgeHTML, "output/badge-chromedp.pdf")
-	if err != nil {
-		panic(err)
+	if err := cdpdf.GeneratePDF(invoiceHTML, "output/invoice-chromedp.pdf"); err != nil {
+		log.Fatal("chromedp invoice pdf:", err)
 	}
 
-	agreementHTML, err := cdpdf.ReadHTML("chromedp/template/agreement.html")
+	badgeHTML, err := cdpdf.RenderHTMLTemplate("chromedp/template/badge.html", cdbadgeData)
 	if err != nil {
-		panic(err)
+		log.Fatal("chromedp badge template:", err)
 	}
-	err = cdpdf.GeneratePDF(agreementHTML, "output/agreement-chromedp.pdf")
+	if err := cdpdf.GeneratePDF(badgeHTML, "output/badge-chromedp.pdf"); err != nil {
+		log.Fatal("chromedp badge pdf:", err)
+	}
+
+	agreementHTML, err := cdpdf.RenderHTMLTemplate("chromedp/template/agreement.html", cdfullAgreement)
 	if err != nil {
-		panic(err)
+		log.Fatal("chromedp agreement template:", err)
+	}
+	if err := cdpdf.GeneratePDF(agreementHTML, "output/agreement-chromedp.pdf"); err != nil {
+		log.Fatal("chromedp agreement pdf:", err)
 	}
 
 	fmt.Println("Generating maroto PDF...")

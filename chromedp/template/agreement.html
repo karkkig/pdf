@@ -19,7 +19,6 @@
         box-sizing: border-box;
     }
 
-    /* Page break for printing */
     .page-break {
         page-break-after: always;
     }
@@ -74,6 +73,7 @@
     th {
         text-align: center;
         font-weight: bold;
+        background: #f0f0f0;
     }
 
     .checkbox {
@@ -114,44 +114,54 @@
         height: 30px;
     }
 
+    ul {
+        font-size: 14px;
+        line-height: 1.8;
+    }
+
+    .notes-box {
+        background: #fafafa;
+        border-left: 3px solid #999;
+        padding: 8px 14px;
+        margin: 12px 0;
+        font-size: 13px;
+    }
 </style>
 </head>
 
 <body>
 
-<!-- PAGE 1 -->
+<!-- ═══════════════════════ PAGE 1 — SERVICES AGREEMENT ═══════════════════════ -->
 <div class="page">
 
-    <div class="top-line">State of <span class="line" style="width:200px;"></span></div>
+    <div class="top-line">State of <strong>{{.State}}</strong></div>
 
     <h1>SERVICES AGREEMENT</h1>
-
     <div class="divider"></div>
 
     <p>
-        This Services Agreement (this “Agreement”) is entered into as of the
-        <span class="line" style="width:60px;"></span> day of
-        <span class="line" style="width:150px;"></span>,
-        20<span class="line" style="width:60px;"></span>, by and among/between:
+        This Services Agreement (this &ldquo;Agreement&rdquo;) is entered into as of the
+        <strong>{{.Day}}</strong> day of <strong>{{.Month}}</strong>,
+        20<strong>{{.Year}}</strong>, by and among/between:
     </p>
 
     <p>
         <strong>Service Provider(s):</strong>
-        <span class="line" style="width:300px;"></span> [Name], located at
-        <span class="line" style="width:300px;"></span> [Address]
-        (collectively “Service Provider”) and
+        {{.ProviderName}} [Name], located at
+        {{.ProviderAddress}} [Address]
+        (collectively &ldquo;Service Provider&rdquo;) and
     </p>
 
     <p>
         <strong>Buyer(s):</strong>
-        <span class="line" style="width:300px;"></span> [Name], located at
-        <span class="line" style="width:300px;"></span> [Address]
-        (collectively “Buyer”).
+        {{.BuyerName}} [Name], located at
+        {{.BuyerAddress}} [Address]
+        (collectively &ldquo;Buyer&rdquo;).
     </p>
 
     <p>
-        Each Service Provider and Buyer may be referred to individually as a “Party”
-        and collectively as the “Parties.”
+        Each Service Provider and Buyer may be referred to individually as a &ldquo;Party&rdquo;
+        and collectively as the &ldquo;Parties.&rdquo;
     </p>
 
     <p class="section-title">1. Services.</p>
@@ -165,24 +175,26 @@
             <th>Number of Projects</th>
             <th>Price per Project</th>
         </tr>
-        <tr><td>&nbsp;</td><td></td><td>$</td></tr>
-        <tr><td>&nbsp;</td><td></td><td>$</td></tr>
-        <tr><td>&nbsp;</td><td></td><td>$</td></tr>
-        <tr><td>&nbsp;</td><td></td><td>$</td></tr>
-        <tr><td>&nbsp;</td><td></td><td>$</td></tr>
+        {{range .Services}}
+        <tr>
+            <td>{{.Description}}</td>
+            <td style="text-align:center;">{{.NumProjects}}</td>
+            <td style="text-align:right;">${{.PricePerPrj}}</td>
+        </tr>
+        {{end}}
     </table>
 
     <p class="section-title">2. Purchase Price.</p>
     <p>
-        Buyer will pay the sum of $
-        <span class="line" style="width:120px;"></span>.
+        Buyer will pay to Service Provider the full and complete purchase price, the sum of
+        <strong>${{.PurchasePrice}}</strong>.
     </p>
 
     <p>
         Unless otherwise stated:
         <span class="checkbox"></span> Service Provider
         <span class="checkbox"></span> Buyer
-        shall be responsible for taxes.
+        shall be responsible for all taxes in connection with the purchase of Services.
     </p>
 
     <p class="section-title">3. Payment.</p>
@@ -191,56 +203,68 @@
         <div class="col">
             <p><span class="checkbox"></span> Cash</p>
             <p><span class="checkbox"></span> Personal check</p>
-            <p><span class="checkbox"></span> Cashier’s check</p>
+            <p><span class="checkbox"></span> Cashier&rsquo;s check</p>
             <p><span class="checkbox"></span> Money order</p>
         </div>
-
         <div class="col">
-            <p><span class="checkbox"></span> Credit/debit card</p>
+            <p><span class="checkbox"></span> Credit / debit card</p>
             <p><span class="checkbox"></span> Wire transfer</p>
-            <p><span class="checkbox"></span> Other: <span class="line" style="width:150px;"></span></p>
+            <p><span class="checkbox"></span> Other: <span class="line" style="width:140px;"></span></p>
         </div>
     </div>
+
+    {{if .Notes}}
+    <div class="notes-box">{{.Notes}}</div>
+    {{end}}
 
 </div>
 
 <div class="page-break"></div>
 
-<!-- PAGE 2 -->
+<!-- ═══════════════════════ PAGE 2 — PAYMENT PLAN ═════════════════════════════ -->
 <div class="page">
 
     <p>
-        By this contract, [Payer] agrees to make payments to [Payee], hereafter known as “Lender”.
+        By this contract, <strong>{{.Payer}}</strong> agrees to make payments to
+        <strong>{{.Payee}}</strong>, hereafter known as &ldquo;Lender,&rdquo; by the
+        following schedule in exchange for <em>{{.Product}}</em>.
+        This payment schedule is enforceable by law, and the methods described below
+        will be used in cases of delinquent payment.
     </p>
 
     <p>
-        Payment of <strong>[amount]</strong> will be made at intervals until total is paid.
+        By this agreement, it is agreed that a payment of <strong>{{.AmountPerPeriod}}</strong>
+        will be surrendered to the Lender every <strong>{{.Interval}}</strong> until the total
+        of the payment required, which is <strong>{{.TotalAmount}}</strong>, has been delivered.
+        The payment plan will take the following form:
     </p>
 
     <ul>
-        <li>[First Payment Date, Amount]</li>
-        <li>[Second Payment Date, Amount]</li>
-        <li>[Third Payment Date, Amount]</li>
-        <li>[Fourth Payment Date, Amount]</li>
-        <li>[Fifth Payment Date, Amount]</li>
-        <li>[Sixth Payment Date, Amount]</li>
+        {{range .Payments}}
+        <li>{{.Date}} &mdash; {{.Amount}}</li>
+        {{end}}
     </ul>
 
+    <p>These payments include any interest and other charges that may apply.</p>
+
     <p>
-        These payments include any interest or additional charges if applicable.
+        This agreement is binding, and failure to meet its terms will allow the Lender to take
+        certain recourse. First, late payments will incur a fee of <strong>{{.LateFee}}</strong>
+        every <strong>{{.Interval}}</strong>. Insufficient payment and bounced checks will incur
+        a fee of <strong>{{.BounceFee}}</strong>. If payment should not be delivered at all,
+        Lender will be entitled to <em>{{.LenderAction}}</em>.
     </p>
 
     <p>
-        Late payments may incur fees. Failure to pay may result in collection action.
+        In addition, the following terms and conditions apply:
+        <em>{{.TermsConditions}}</em>.
     </p>
 
     <p>
-        Additional terms:
-        <span class="line" style="width:100%;"></span>
-    </p>
-
-    <p>
-        By signing, all parties agree to the terms stated above.
+        By signing this agreement, all parties agree to the terms as described above.
+        Alterations to this agreement can only be made by both parties and must be placed
+        in writing. Both parties will receive a printed copy of this agreement, and will be
+        responsible for upholding its terms.
     </p>
 
     <div class="signature">
@@ -248,7 +272,7 @@
         <div class="signature-row">
             <div class="sig-box">
                 <div class="sig-line"></div>
-                (Payer)
+                ({{.Payer}} &mdash; Payer)
             </div>
             <div class="sig-box">
                 <div class="sig-line"></div>
@@ -259,7 +283,7 @@
         <div class="signature-row">
             <div class="sig-box">
                 <div class="sig-line"></div>
-                (Payee)
+                ({{.Payee}} &mdash; Payee)
             </div>
             <div class="sig-box">
                 <div class="sig-line"></div>

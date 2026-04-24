@@ -38,6 +38,8 @@
         align-items: center;
         justify-content: center;
         font-weight: bold;
+        font-size: 12px;
+        text-align: center;
     }
 
     .top-info {
@@ -52,6 +54,14 @@
 
     .section h4 {
         margin-bottom: 5px;
+        text-transform: uppercase;
+        color: #5b21b6;
+    }
+
+    .section p {
+        margin: 2px 0;
+        font-size: 14px;
+        color: #444;
     }
 
     table {
@@ -67,10 +77,16 @@
     th, td {
         padding: 10px;
         text-align: left;
+        font-size: 14px;
     }
 
     th {
-        background: #f0f0f0;
+        background: #222;
+        color: #fff;
+    }
+
+    tr:nth-child(even) td {
+        background: #f7f7f7;
     }
 
     .right {
@@ -82,30 +98,47 @@
         margin-left: auto;
         margin-top: 20px;
         border: 1px solid #999;
+        font-size: 14px;
     }
 
     .summary div {
         display: flex;
         justify-content: space-between;
-        padding: 10px;
-        border-bottom: 1px solid #999;
+        padding: 8px 10px;
+        border-bottom: 1px solid #ddd;
     }
 
-    .summary div:last-child {
-        border-bottom: none;
+    .summary div.total {
+        background: #5b21b6;
+        color: #fff;
         font-weight: bold;
+        border-bottom: none;
     }
 
     .footer {
         margin-top: 50px;
         display: flex;
         justify-content: space-between;
+        border-top: 1px solid #ddd;
+        padding-top: 20px;
+    }
+
+    .footer p {
+        margin: 3px 0;
+        font-size: 13px;
+        color: #444;
     }
 
     .notes {
         margin-top: 20px;
+        font-size: 13px;
     }
 
+    .meta {
+        font-size: 13px;
+        color: #555;
+        margin: 4px 0;
+    }
 </style>
 </head>
 <body>
@@ -113,93 +146,84 @@
 <div class="invoice-container">
 
     <div class="header">
-        <h1>INVOICE</h1>
-        <div class="logo">LOGO</div>
+        <div>
+            <h1>INVOICE</h1>
+            <p class="meta"><strong>Invoice Number:</strong> #{{.Number}}</p>
+            <p class="meta"><strong>Invoice Date:</strong> {{formatDate .Date "02/01/2006"}}</p>
+        </div>
+        <div class="logo">STUDIO<br>SHODWE</div>
     </div>
-
-    <p><strong>Invoice Number:</strong> #123456</p>
-    <p><strong>Invoice Date:</strong> 24/05/2030</p>
 
     <div class="top-info">
         <div class="section">
-            <h4>STUDIO SHOWDE</h4>
-            <p>123 Anywhere St., Any City, ST 12345</p>
-            <p>+123-456-7890</p>
-            <p>hello@reallygreatsite.com</p>
+            <h4>{{.Provider.Name}}</h4>
+            <p>{{.Provider.Address}}, {{.Provider.City}}</p>
+            <p>{{.Provider.Phone}}</p>
+            <p>{{.Provider.Email}}</p>
         </div>
 
         <div class="section">
-            <h4>BILL TO</h4>
-            <p>Rachael Beaudry</p>
-            <p>123 Anywhere St., Any City, ST 12345</p>
-            <p>+123-456-7890</p>
-            <p>hello@reallygreatsite.com</p>
+            <h4>Bill To</h4>
+            <p>{{.Client.Name}}</p>
+            <p>{{.Client.Address}}, {{.Client.City}}</p>
+            <p>{{.Client.Phone}}</p>
+            <p>{{.Client.Email}}</p>
         </div>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th>Item & Description</th>
+                <th>Item &amp; Description</th>
                 <th>Unit Price</th>
                 <th>Qty</th>
                 <th class="right">Amount</th>
             </tr>
         </thead>
         <tbody>
+            {{range .Items}}
             <tr>
-                <td>Service 1</td>
-                <td>$100.00</td>
-                <td>1</td>
-                <td class="right">$100.00</td>
+                <td>{{.Description}}</td>
+                <td>{{money .UnitPrice}}</td>
+                <td>{{.Qty}}</td>
+                <td class="right">{{money (.Amount)}}</td>
             </tr>
-            <tr>
-                <td>Service 2</td>
-                <td>$150.00</td>
-                <td>1</td>
-                <td class="right">$150.00</td>
-            </tr>
-            <tr>
-                <td>Service 3</td>
-                <td>$200.00</td>
-                <td>1</td>
-                <td class="right">$200.00</td>
-            </tr>
+            {{end}}
         </tbody>
     </table>
 
     <div class="notes">
         <strong>NOTES / TERMS:</strong>
-        <p>Payment is due within 15 days of receiving this invoice.</p>
+        <p>{{nl2br .Notes}}</p>
     </div>
 
     <div class="summary">
         <div>
             <span>Sub-Total</span>
-            <span>$450.00</span>
+            <span>{{money (.SubTotal)}}</span>
         </div>
         <div>
-            <span>Tax (6%)</span>
-            <span>$36.00</span>
+            <span>Tax ({{percent .TaxRate}})</span>
+            <span>{{money (.TaxAmount)}}</span>
         </div>
-        <div>
+        <div class="total">
             <span>Total</span>
-            <span>$486.00</span>
+            <span>{{money (.TotalAmount)}}</span>
         </div>
     </div>
 
     <div class="footer">
         <div>
             <strong>PAYMENT METHOD</strong>
-            <p>Bank: Borcelle Bank</p>
-            <p>Account Name: Studio Showde</p>
-            <p>Account Number: 1234567890</p>
+            <p>Bank: {{.PaymentMethod.Bank}}</p>
+            <p>Account Name: {{.PaymentMethod.AccountName}}</p>
+            <p>Account Number: {{.PaymentMethod.AccountNumber}}</p>
         </div>
 
         <div>
             <strong>PREPARED BY</strong>
-            <p>Benjamin Shah</p>
-            <p>Sales Administrator, Studio Showde</p>
+            <p>{{.PreparedBy.Name}}</p>
+            <p>{{.PreparedBy.Title}}</p>
         </div>
     </div>
 
