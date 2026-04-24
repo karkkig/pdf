@@ -350,22 +350,3 @@ func wrapTextRet(buf *bytes.Buffer, s string, x, y, maxW float64, size int, bold
 	}
 	return curY
 }
-
-func splitWords(s string) []string {
-	var words []string
-	word := ""
-	for _, c := range s {
-		if c == ' ' || c == '\n' {
-			if word != "" {
-				words = append(words, word)
-				word = ""
-			}
-		} else {
-			word += string(c)
-		}
-	}
-	if word != "" {
-		words = append(words, word)
-	}
-	return words
-}

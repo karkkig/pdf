@@ -226,8 +226,15 @@ func main() {
 		log.Fatalf("Failed to generate invoice: %v", err)
 	}
 
+	Bdata := pcpdf.GPayBadgeData{
+		BusinessName: "Your Business Name",
+		PhoneNumber:  "+91 12345 67890",
+		UPIHandle:    "12345 67890@yhh",
+		QRContent:    "upi://pay?pa=1234567890@yhh&pn=Your+Business+Name&cu=INR",
+	}
+
 	// Generate Payment Badge PDF
-	if err := pcpdf.GeneratePaymentBadge("output/badge-pdfcpu.pdf"); err != nil {
+	if err := pcpdf.GenerateGPayBadge("output/badge-pdfcpu.pdf", Bdata); err != nil {
 		log.Fatalf("Failed to generate payment badge: %v", err)
 	}
 

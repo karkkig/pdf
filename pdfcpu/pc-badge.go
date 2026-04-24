@@ -2,140 +2,259 @@ package pcpdf
 
 import (
 	"bytes"
+	"compress/zlib"
 	"fmt"
+	"image"
+	"image/color"
+	_ "image/png" // register PNG decoder
 	"os"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
-// BadgeData holds fields for the GPay-style payment badge.
-type BadgeData struct {
-	PaymentMethod string // e.g. "GPay"
-	BusinessName  string
-	PhoneNumber   string
-	UPIAddress    string // shown below QR
+// GPayBadgeData holds all fields for the badge.
+type GPayBadgeData struct {
+	BusinessName string
+	PhoneNumber  string
+	QRContent    string // UPI deep-link: "upi://pay?pa=handle@yhh&pn=Name&cu=INR"
+	UPIHandle    string // shown below QR
 }
 
-// GeneratePaymentBadge creates a vertical payment badge PDF (portrait card).
-func GeneratePaymentBadge(outPath string) error {
-	data := BadgeData{
-		PaymentMethod: "GPay",
-		BusinessName:  "Your Business Name",
-		PhoneNumber:   "+91 12345 67890",
-		UPIAddress:    "12345 67890@yhh",
-	}
+// pdfEscape escapes special characters in PDF literal strings
 
-	w, h := 250.0, 400.0 // narrow card dimensions in points
+// ascii85Encode encodes bytes to ASCII85 for use with /ASCII85Decode filter.
+func ascii85Encode(src []byte) string {
 	var buf bytes.Buffer
-
-	// ── helpers ────────────────────────────────────────────────────────────────
-	text := func(x, y float64, size int, bold bool, color, s string) {
-		fontName := "Helvetica"
-		if bold {
-			fontName = "Helvetica-Bold"
+	for i := 0; i < len(src); i += 4 {
+		end := i + 4
+		if end > len(src) {
+			end = len(src)
 		}
-		fmt.Fprintf(&buf, "BT /%s %d Tf %s rg %.2f %.2f Td (%s) Tj ET\n",
-			fontName, size, color, x, y, pdfEscape(s))
-	}
-	rect := func(x, y, rw, rh float64, fill string) {
-		fmt.Fprintf(&buf, "%s rg %.2f %.2f %.2f %.2f re f\n", fill, x, y, rw, rh)
-	}
-	line := func(x1, y1, x2, y2 float64, width float64, color string) {
-		fmt.Fprintf(&buf, "%s RG %.2f w %.2f %.2f m %.2f %.2f l S\n",
-			color, width, x1, y1, x2, y2)
-	}
-
-	// ── White background ──────────────────────────────────────────────────────
-	rect(0, 0, w, h, "1 1 1")
-
-	// ── Light green header band ───────────────────────────────────────────────
-	rect(0, h-90, w, 90, "0.85 0.95 0.85")
-
-	// ── GPay logo placeholder ─────────────────────────────────────────────────
-	// Simulate the "G" with a coloured circle
-	cx, cy, r := w/2, h-50.0, 22.0
-	drawCircleApprox(&buf, cx, cy, r, "0.26 0.52 0.96") // blue
-	text(cx-7, cy-5, 14, true, "1 1 1", "G")
-
-	// ── Payment label ─────────────────────────────────────────────────────────
-	text(w/2-22, h-82, 8, false, "0.2 0.2 0.2", data.PaymentMethod)
-	text(w/2-30, h-94, 8, false, "0.4 0.4 0.4", "accepted here")
-
-	// ── Divider ───────────────────────────────────────────────────────────────
-	line(20, h-105, w-20, h-105, 0.5, "0.8 0.8 0.8")
-
-	// ── Business details ──────────────────────────────────────────────────────
-	text(w/2-50, h-125, 11, true, "0 0 0", data.BusinessName)
-	text(w/2-42, h-142, 9, false, "0.3 0.3 0.3", data.PhoneNumber)
-
-	// ── QR code placeholder (drawn as a bordered square with pattern) ─────────
-	qx, qy, qs := 45.0, 130.0, 160.0
-	rect(qx, qy, qs, qs, "1 1 1")
-	// Outer border
-	fmt.Fprintf(&buf, "0 0 0 RG 2 w %.2f %.2f %.2f %.2f re S\n", qx, qy, qs, qs)
-
-	// Position markers (three corner squares — typical QR style)
-	drawQRCorner(&buf, qx+8, qy+qs-36, 28)
-	drawQRCorner(&buf, qx+qs-36, qy+qs-36, 28)
-	drawQRCorner(&buf, qx+8, qy+8, 28)
-
-	// Data modules simulation (small squares scattered)
-	for row := 0; row < 8; row++ {
-		for col := 0; col < 8; col++ {
-			if (row+col)%3 != 0 {
-				mx := qx + 45 + float64(col)*9
-				my := qy + 45 + float64(row)*8
-				rect(mx, my, 6, 6, "0 0 0")
+		n := end - i
+		var b uint32
+		for j := 0; j < 4; j++ {
+			b <<= 8
+			if j < n {
+				b |= uint32(src[i+j])
 			}
 		}
+		if n == 4 && b == 0 {
+			buf.WriteByte('z')
+			continue
+		}
+		var out [5]byte
+		for j := 4; j >= 0; j-- {
+			out[j] = byte(b%85) + '!'
+			b /= 85
+		}
+		buf.Write(out[:n+1])
+	}
+	buf.WriteString("~>")
+	return buf.String()
+}
+
+// pngToZlibRGB decodes a PNG image and returns (zlibCompressedRGBPixels, width, height, err).
+// PDF /FlateDecode expects raw scanline pixels with a filter byte prefix per row.
+// We use PNG-style filter byte 0x00 (None) per row for simplicity.
+func pngToZlibRGB(pngBytes []byte) ([]byte, int, int, error) {
+	img, _, err := image.Decode(bytes.NewReader(pngBytes))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	bounds := img.Bounds()
+	w, h := bounds.Max.X, bounds.Max.Y
+
+	// Build raw scanlines: each row prefixed with filter byte 0x00
+	var raw bytes.Buffer
+	for y := 0; y < h; y++ {
+		raw.WriteByte(0x00) // PNG filter type None
+		for x := 0; x < w; x++ {
+			c := color.RGBAModel.Convert(img.At(x, y)).(color.RGBA)
+			raw.WriteByte(c.R)
+			raw.WriteByte(c.G)
+			raw.WriteByte(c.B)
+		}
 	}
 
-	// ── UPI address below QR ──────────────────────────────────────────────────
-	text(w/2-50, qy-20, 9, false, "0.3 0.3 0.3", data.UPIAddress)
+	// zlib-compress the scanlines
+	var zlibBuf bytes.Buffer
+	zw := zlib.NewWriter(&zlibBuf)
+	zw.Write(raw.Bytes())
+	zw.Close()
 
-	// ── Bottom accent bar ─────────────────────────────────────────────────────
-	rect(0, 0, w, 15, "0.26 0.52 0.96")
+	return zlibBuf.Bytes(), w, h, nil
+}
 
-	raw := buildRawPDF([]string{buf.String()}, w, h)
-	rs := bytes.NewReader([]byte(raw))
+// GenerateGPayBadge writes a crisp GPay-style payment badge PDF using pdfcpu.
+//
+// Dependencies:
+//
+//	go get github.com/skip2/go-qrcode
+//	go get github.com/pdfcpu/pdfcpu
+func GenerateGPayBadge(outPath string, d GPayBadgeData) error {
+	// ── 1. Generate QR at 512px — balanced between sharp and compact ──────────
+	qrPNG, err := qrcode.Encode(d.QRContent, qrcode.High, 512)
+	if err != nil {
+		return fmt.Errorf("qr encode: %w", err)
+	}
+
+	// Decode PNG → zlib-compressed raw RGB pixels for embedding in PDF
+	qrPixels, qrW, qrH, err := pngToZlibRGB(qrPNG)
+	if err != nil {
+		return fmt.Errorf("png decode: %w", err)
+	}
+	qrStream := ascii85Encode(qrPixels)
+
+	// ── 2. Page dimensions (points; 72pt = 1 inch) ────────────────────────────
+	// 200 × 320 pt = ~70 × 113 mm — compact portrait card matching the image
+	W, H := 200.0, 320.0
+
+	// ── 3. Content stream ─────────────────────────────────────────────────────
+	var cs bytes.Buffer
+	wf := func(f string, a ...any) { fmt.Fprintf(&cs, f, a...) }
+
+	fillRect := func(x, y, rw, rh, r, g, b float64) {
+		wf("%.3f %.3f %.3f rg %.2f %.2f %.2f %.2f re f\n", r, g, b, x, y, rw, rh)
+	}
+	hline := func(x1, x2, y, lw, r, g, b float64) {
+		wf("%.3f %.3f %.3f RG %.2f w %.2f %.2f m %.2f %.2f l S\n", r, g, b, lw, x1, y, x2, y)
+	}
+	putText := func(font string, size, x, y, r, g, b float64, s string) {
+		wf("BT /%s %.2f Tf %.3f %.3f %.3f rg %.2f %.2f Td (%s) Tj ET\n",
+			font, size, r, g, b, x, y, pdfEscape(s))
+	}
+	// approximate centering for Helvetica (char width ≈ size*0.45)
+	center := func(font string, size, y, r, g, b float64, s string) {
+		x := (W - float64(len(s))*size*0.45) / 2
+		putText(font, size, x, y, r, g, b, s)
+	}
+
+	// White background
+	fillRect(0, 0, W, H, 1, 1, 1)
+
+	// "G" blue + "Pay" dark
+	logoY := H - 42.0
+	putText("Helvetica-Bold", 22, W/2-24, logoY, 0.259, 0.522, 0.957, "G")
+	putText("Helvetica-Bold", 18, W/2-2, logoY, 0.13, 0.13, 0.13, "Pay")
+
+	center("Helvetica", 7, H-55, 0.65, 0.65, 0.65, "LogoHere")
+	center("Helvetica", 8, H-68, 0.50, 0.50, 0.50, "accepted here")
+
+	hline(18, W-18, H-78, 0.4, 0.82, 0.82, 0.82)
+
+	center("Helvetica-Bold", 11, H-98, 0.08, 0.08, 0.08, d.BusinessName)
+	center("Helvetica", 9, H-113, 0.38, 0.38, 0.38, d.PhoneNumber)
+
+	// QR image — placed via XObject /QR
+	qrSize := 148.0
+	qrX := (W - qrSize) / 2
+	qrY := 68.0
+
+	// white bg + light border behind QR
+	fillRect(qrX-3, qrY-3, qrSize+6, qrSize+6, 1, 1, 1)
+	wf("0.85 0.85 0.85 RG 0.5 w %.2f %.2f %.2f %.2f re S\n", qrX-3, qrY-3, qrSize+6, qrSize+6)
+
+	// draw the QR XObject
+	wf("q %.2f 0 0 %.2f %.2f %.2f cm /QR Do Q\n", qrSize, qrSize, qrX, qrY)
+
+	center("Helvetica-Bold", 9, qrY-18, 0.08, 0.08, 0.08, d.UPIHandle)
+
+	// Google-colour bottom bar (6 equal segments)
+	segW := W / 6
+	barColors := [][3]float64{
+		{0.259, 0.522, 0.957}, // blue
+		{0.918, 0.263, 0.208}, // red
+		{0.984, 0.737, 0.016}, // yellow
+		{0.259, 0.522, 0.957}, // blue
+		{0.204, 0.659, 0.325}, // green
+		{0.918, 0.263, 0.208}, // red
+	}
+	for i, c := range barColors {
+		fillRect(float64(i)*segW, 0, segW, 14, c[0], c[1], c[2])
+	}
+
+	pageStream := cs.String()
+
+	// ── 4. Assemble raw PDF ───────────────────────────────────────────────────
+	var raw bytes.Buffer
+	off := make([]int, 7) // track byte offsets for xref, objects 1–6 used
+
+	wr := func(s string) { raw.WriteString(s) }
+	wrl := func(s string) { raw.WriteString(s + "\n") }
+	wrf := func(f string, a ...any) { fmt.Fprintf(&raw, f, a...) }
+
+	wrl("%PDF-1.4")
+	wrl("%\xe2\xe3\xcf\xd3") // binary marker
+
+	// obj 1: Catalog
+	off[1] = raw.Len()
+	wrl("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj")
+
+	// obj 2: Pages
+	off[2] = raw.Len()
+	wrl("2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj")
+
+	// obj 3: Page — references content (4) and QR image (5)
+	off[3] = raw.Len()
+	wrl("3 0 obj")
+	wrf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f]\n", W, H)
+	wrl("   /Contents 4 0 R")
+	wrl("   /Resources <<")
+	wrl("     /Font <<")
+	wrl("       /Helvetica      << /Type /Font /Subtype /Type1 /BaseFont /Helvetica      /Encoding /WinAnsiEncoding >>")
+	wrl("       /Helvetica-Bold << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+	wrl("     >>")
+	wrl("     /XObject << /QR 5 0 R >>")
+	wrl("   >>")
+	wrl(">> endobj")
+
+	// obj 4: content stream
+	off[4] = raw.Len()
+	wrl("4 0 obj")
+	wrf("<< /Length %d >>\n", len(pageStream))
+	wrl("stream")
+	wr(pageStream)
+	wrl("\nendstream endobj")
+
+	// obj 5: QR image XObject
+	// Filter chain: ASCII85Decode → FlateDecode → raw RGB scanlines with filter bytes
+	// /DecodeParms for FlateDecode: Predictor 15 = PNG adaptive, Colors 3, Columns = qrW
+	off[5] = raw.Len()
+	wrl("5 0 obj")
+	wrf("<< /Type /XObject /Subtype /Image /Width %d /Height %d\n", qrW, qrH)
+	wrl("   /ColorSpace /DeviceRGB /BitsPerComponent 8")
+	wrl("   /Filter [/ASCII85Decode /FlateDecode]")
+	wrf("   /DecodeParms [null << /Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns %d >>]\n", qrW)
+	wrf("   /Length %d >>\n", len(qrStream))
+	wrl("stream")
+	wr(qrStream)
+	wrl("\nendstream endobj")
+
+	// xref
+	xrefPos := raw.Len()
+	wrl("xref")
+	wrf("0 6\n")
+	wrl("0000000000 65535 f ")
+	for i := 1; i <= 5; i++ {
+		wrf("%010d 00000 n \n", off[i])
+	}
+	wrl("trailer << /Size 6 /Root 1 0 R >>")
+	wrl("startxref")
+	wrf("%d\n", xrefPos)
+	wr("%%EOF")
+
+	// ── 5. Run through pdfcpu to normalize + validate ─────────────────────────
+	rs := bytes.NewReader(raw.Bytes())
 	conf := model.NewDefaultConfiguration()
 	conf.ValidationMode = model.ValidationRelaxed
-	outFile, err := os.Create(outPath)
+
+	out, err := os.Create(outPath)
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
+	defer out.Close()
 
-	return api.Optimize(rs, outFile, conf)
-}
-
-// drawCircleApprox approximates a circle using 4 Bézier curves.
-func drawCircleApprox(buf *bytes.Buffer, cx, cy, r float64, fill string) {
-	k := 0.5523 * r
-	fmt.Fprintf(buf, "%s rg\n", fill)
-	fmt.Fprintf(buf, "%.2f %.2f m\n", cx+r, cy)
-	fmt.Fprintf(buf, "%.2f %.2f %.2f %.2f %.2f %.2f c\n",
-		cx+r, cy+k, cx+k, cy+r, cx, cy+r)
-	fmt.Fprintf(buf, "%.2f %.2f %.2f %.2f %.2f %.2f c\n",
-		cx-k, cy+r, cx-r, cy+k, cx-r, cy)
-	fmt.Fprintf(buf, "%.2f %.2f %.2f %.2f %.2f %.2f c\n",
-		cx-r, cy-k, cx-k, cy-r, cx, cy-r)
-	fmt.Fprintf(buf, "%.2f %.2f %.2f %.2f %.2f %.2f c\n",
-		cx+k, cy-r, cx+r, cy-k, cx+r, cy)
-	buf.WriteString("f\n")
-}
-
-// drawQRCorner draws the three-square finder pattern used in QR codes.
-func drawQRCorner(buf *bytes.Buffer, x, y, size float64) {
-	inner := size * 0.6
-	innerOff := (size - inner) / 2
-	core := size * 0.3
-	coreOff := (size - core) / 2
-
-	fmt.Fprintf(buf, "0 0 0 rg %.2f %.2f %.2f %.2f re f\n", x, y, size, size)
-	fmt.Fprintf(buf, "1 1 1 rg %.2f %.2f %.2f %.2f re f\n",
-		x+innerOff, y+innerOff, inner, inner)
-	fmt.Fprintf(buf, "0 0 0 rg %.2f %.2f %.2f %.2f re f\n",
-		x+coreOff, y+coreOff, core, core)
+	return api.Optimize(rs, out, conf)
 }

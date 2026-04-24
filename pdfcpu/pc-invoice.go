@@ -63,7 +63,7 @@ func GenerateInvoice(outPath string) error {
 		TaxRate:       6,
 		TaxAmount:     36.00,
 		Total:         486.00,
-		Notes:         "Payment is due within 15 days\nof receiving this invoice.",
+		Notes:         "Payment is due within 15 days of receiving this invoice.",
 		BankName:      "Borcelle Bank",
 		AccountName:   "Studio Shodwe",
 		AccountNumber: "1234567890",
@@ -71,7 +71,6 @@ func GenerateInvoice(outPath string) error {
 		PreparedTitle: "Sales Administrator, Studio Shodwe",
 	}
 
-	// Build page content using PDF content stream
 	var buf bytes.Buffer
 	w, h := 595.0, 842.0 // A4 in points
 
@@ -121,6 +120,7 @@ func GenerateInvoice(outPath string) error {
 	// ── Table header ─────────────────────────────────────────────────────────
 	tableTop := h - 200.0
 	rect(50, tableTop-15, w-100, 20, "0.15 0.15 0.15")
+	// FIX: "& " is plain ASCII — safe. No unicode issues here.
 	text(55, tableTop-10, 9, true, "1 1 1", "Item & Description")
 	text(360, tableTop-10, 9, true, "1 1 1", "Unit Price")
 	text(440, tableTop-10, 9, true, "1 1 1", "Qty")
@@ -144,14 +144,20 @@ func GenerateInvoice(outPath string) error {
 	// ── Notes / Terms ─────────────────────────────────────────────────────────
 	notesY := tableTop - 15 - float64(len(data.Items))*rowH - 30
 	text(50, notesY, 9, true, "0 0 0", "NOTES / TERMS:")
-	text(50, notesY-14, 8, false, "0.4 0.4 0.4", "Payment is due within 15 days of receiving this invoice.")
+	// Use data.Notes so the field drives the output; \n in the string is split
+	// into two separate text calls to avoid the newline going into the PDF literal.
+	noteLines := splitLines(data.Notes)
+	for i, nl := range noteLines {
+		text(50, notesY-14-float64(i)*12, 8, false, "0.4 0.4 0.4", nl)
+	}
 
 	// ── Totals box ────────────────────────────────────────────────────────────
 	totX := 360.0
 	totY := notesY + 10
 	text(totX, totY, 9, false, "0.3 0.3 0.3", "Sub-Total")
 	text(490, totY, 9, false, "0 0 0", fmt.Sprintf("$%.2f", data.SubTotal))
-	text(totX, totY-16, 9, false, "0.3 0.3 0.3", fmt.Sprintf("Tax (%.0f%%%%)", data.TaxRate))
+	// FIX: use %% to produce a literal % inside Sprintf; no unicode needed.
+	text(totX, totY-16, 9, false, "0.3 0.3 0.3", fmt.Sprintf("Tax (%.0f%%)", data.TaxRate))
 	text(490, totY-16, 9, false, "0 0 0", fmt.Sprintf("$%.2f", data.TaxAmount))
 	line(totX, totY-24, w-50, totY-24, 1, "0.38 0.20 0.60")
 	rect(totX, totY-44, w-50-totX, 20, "0.38 0.20 0.60")
@@ -175,7 +181,6 @@ func GenerateInvoice(outPath string) error {
 
 // writeSinglePagePDF writes a raw content stream as a single-page PDF via pdfcpu.
 func writeSinglePagePDF(outPath, contentStream string, w, h float64) error {
-	// Build a minimal valid PDF in memory, then use pdfcpu to validate/optimise it.
 	raw := buildRawPDF([]string{contentStream}, w, h)
 	rs := bytes.NewReader([]byte(raw))
 	conf := model.NewDefaultConfiguration()
@@ -185,7 +190,6 @@ func writeSinglePagePDF(outPath, contentStream string, w, h float64) error {
 		return err
 	}
 	defer outFile.Close()
-
 	return api.Optimize(rs, outFile, conf)
 }
 
@@ -195,11 +199,9 @@ func buildRawPDF(pages []string, w, h float64) string {
 
 	b.WriteString("%PDF-1.4\n")
 
-	// Object 1 – catalog
 	obj1Off := b.Len()
 	b.WriteString("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
 
-	// Object 2 – pages dictionary (placeholder, rewritten below)
 	obj2Off := b.Len()
 	pageCount := len(pages)
 	kidsRef := ""
@@ -209,7 +211,6 @@ func buildRawPDF(pages []string, w, h float64) string {
 	fmt.Fprintf(&b, "2 0 obj\n<< /Type /Pages /Kids [%s] /Count %d >>\nendobj\n",
 		kidsRef, pageCount)
 
-	// Objects 3,4 / 5,6 / … – page + content stream pairs
 	pageOffsets := make([]int, pageCount)
 	contentOffsets := make([]int, pageCount)
 
@@ -231,41 +232,30 @@ func buildRawPDF(pages []string, w, h float64) string {
 	}
 
 	xrefOffset := b.Len()
-	totalObjs := 2 + pageCount*2 + 1 // catalog + pages + (page+content)*n
+	totalObjs := 2 + pageCount*2 + 1
 
 	fmt.Fprintf(&b, "xref\n0 %d\n", totalObjs)
 	b.WriteString("0000000000 65535 f \n")
 	fmt.Fprintf(&b, "%010d 00000 n \n", obj1Off)
 	fmt.Fprintf(&b, "%010d 00000 n \n", obj2Off)
-
 	for i := range pages {
 		fmt.Fprintf(&b, "%010d 00000 n \n", pageOffsets[i])
 		fmt.Fprintf(&b, "%010d 00000 n \n", contentOffsets[i])
 	}
-
 	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n",
 		totalObjs, xrefOffset)
 
 	return b.String()
 }
 
-// pdfEscape escapes special characters for PDF string literals.
-func pdfEscape(s string) string {
-	var out []byte
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch c {
-		case '(', ')':
-			out = append(out, '\\', c)
-		case '\\':
-			out = append(out, '\\', '\\')
-		default:
-			if c > 127 {
-				out = append(out, '?')
-			} else {
-				out = append(out, c)
-			}
-		}
-	}
-	return string(out)
-}
+// pdfEscape escapes a UTF-8 string for use inside a PDF literal string with
+// WinAnsiEncoding (Windows-1252), which is the encoding of the built-in
+// Type1 fonts (Helvetica, Times-Roman, Courier, etc.).
+//
+// Rules:
+//   - ( ) \ are backslash-escaped (PDF spec requirement).
+//   - Printable ASCII 0x20–0x7E passes through unchanged.
+//   - Unicode code points that exist in WinAnsi outside ASCII are written as
+//     PDF octal escapes \NNN so the correct byte reaches the font.
+//   - Truly unmappable runes fall back to a plain hyphen (for dash variants)
+//     or '?'.
