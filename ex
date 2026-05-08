@@ -1,120 +1,64 @@
-package pdf
+package chromedp
 
 import (
-	"context"
-	"errors"
-	"net/url"
+	"bytes"
+	"encoding/json"
+	"html/template"
+	"io"
+	"log/slog"
+	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
-	"time"
 
-	"github.com/chromedp/cdproto/page"
-	"github.com/chromedp/chromedp"
+	"github.com/labstack/echo/v4"
 )
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const (
-	paperWidthIn  = 8.27  // A4
-	paperHeightIn = 11.69 // A4
-	renderTimeout = 20 * time.Second
-	renderSettle  = 2 * time.Second
-)
-
-// ─── Errors ───────────────────────────────────────────────────────────────────
-
-var (
-	ErrMissingFilename = errors.New("X-PDF-Name header is required")
-	ErrEmptyBody       = errors.New("HTML body must not be empty")
-)
-
-// ─── Validation ───────────────────────────────────────────────────────────────
-
-// SanitizeFilename cleans the provided name, ensures a .pdf extension,
-// and strips any path components to prevent traversal.
-func SanitizeFilename(raw string) (string, error) {
-	name := strings.TrimSpace(raw)
-	if name == "" {
-		return "", ErrMissingFilename
-	}
-
-	name = filepath.Base(name)
-	if !strings.HasSuffix(strings.ToLower(name), ".pdf") {
-		name += ".pdf"
-	}
-
-	return name, nil
+type RequestBody struct {
+	Template string         `json:"template"`
+	Data     map[string]any `json:"data"`
 }
 
-// ValidateBody returns ErrEmptyBody when the HTML string is blank.
-func ValidateBody(html string) error {
-	if strings.TrimSpace(html) == "" {
-		return ErrEmptyBody
-	}
-	return nil
-}
-
-// ─── Generation ───────────────────────────────────────────────────────────────
-
-// Generate renders html to a PDF and writes it to a temporary file.
-// The caller is responsible for removing the file after use.
-func Generate(html string) (string, error) {
-	tmpFile, err := os.CreateTemp("", "*.pdf")
+func GenerateHandler(c echo.Context) error {
+	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return "", err
-	}
-	tmpFile.Close()
-
-	outputPath := tmpFile.Name()
-	if err = renderToFile(html, outputPath); err != nil {
-		os.Remove(outputPath)
-		return "", err
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	return outputPath, nil
-}
-
-// GenerateNamed is like Generate but places the file in the OS temp
-// directory under the given filename. Useful when the download name matters.
-func GenerateNamed(html, filename string) (string, error) {
-	outputPath := filepath.Join(os.TempDir(), filename)
-	if err := renderToFile(html, outputPath); err != nil {
-		return "", err
+	var req RequestBody
+	if err := json.Unmarshal(body, &req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
 	}
-	return outputPath, nil
-}
 
-// renderToFile is the single place that talks to chromedp.
-func renderToFile(html, outputPath string) error {
-	ctx, cancel := chromedp.NewContext(context.Background())
-	defer cancel()
+	if req.Template == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "template field is required"})
+	}
 
-	ctx, cancel = context.WithTimeout(ctx, renderTimeout)
-	defer cancel()
+	if err := ValidateBody(req.Template); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
 
-	wrapped := `<html><head><meta charset="UTF-8">` +
-		`<style>body{margin:0;}</style></head><body>` + html + `</body></html>`
-
-	htmlURL := "data:text/html," + url.PathEscape(wrapped)
-
-	var pdfBuf []byte
-	err := chromedp.Run(ctx,
-		chromedp.Navigate(htmlURL),
-		chromedp.Sleep(renderSettle),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			buf, _, err := page.PrintToPDF().
-				WithPrintBackground(true).
-				WithPaperWidth(paperWidthIn).
-				WithPaperHeight(paperHeightIn).
-				Do(ctx)
-			pdfBuf = buf
-			return err
-		}),
-	)
+	tmpl, err := template.New("doc").Parse(req.Template)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "template parse error: " + err.Error()})
 	}
 
-	return os.WriteFile(outputPath, pdfBuf, 0o644)
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, req.Data); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "template render error: " + err.Error()})
+	}
+
+	rawFilename := c.Param("filename")
+	filename, err := SanitizeFilename(rawFilename)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	slog.Info("pdf request", "filename", filename, "html_length", rendered.Len())
+
+	path, err := GenerateNamed(rendered.String(), filename)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	defer os.Remove(path)
+
+	return c.Attachment(path, filename)
 }
