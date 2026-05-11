@@ -1,47 +1,131 @@
-{
-  "template": "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Services Agreement</title><style>body{font-family:\"Times New Roman\",serif;margin:0;background:#f2f2f2;}.page{width:800px;margin:30px auto;background:#fff;padding:60px 70px;box-sizing:border-box;}.page-break{page-break-after:always;}h1{text-align:center;font-size:34px;margin:10px 0;letter-spacing:1px;}.top-line{text-align:left;font-size:14px;margin-bottom:10px;}.divider{border-top:3px double #000;margin:10px 0 25px;}p{font-size:14px;line-height:1.6;margin:10px 0;}.line{display:inline-block;border-bottom:1px solid #000;min-width:150px;}.section-title{font-weight:bold;margin-top:15px;}table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px;}th,td{border:1px solid #000;padding:8px;}th{text-align:center;font-weight:bold;background:#f0f0f0;}.checkbox{display:inline-block;width:14px;height:14px;border:1px solid #000;margin-right:6px;vertical-align:middle;}.two-col{display:flex;justify-content:space-between;margin-top:20px;}.col{width:48%;}.signature{margin-top:40px;}.signature-row{display:flex;justify-content:space-between;margin-top:30px;}.sig-box{width:48%;}.sig-line{border-bottom:1px solid #000;height:30px;}ul{font-size:14px;line-height:1.8;}.notes-box{background:#fafafa;border-left:3px solid #999;padding:8px 14px;margin:12px 0;font-size:13px;}</style></head><body><div class=\"page\"><div class=\"top-line\">State of <strong>{{.State}}</strong></div><h1>SERVICES AGREEMENT</h1><div class=\"divider\"></div><p>This Services Agreement (this &ldquo;Agreement&rdquo;) is entered into as of the <strong>{{.Day}}</strong> day of <strong>{{.Month}}</strong>, 20<strong>{{.Year}}</strong>, by and among/between:</p><p><strong>Service Provider(s):</strong> {{.ProviderName}} [Name], located at {{.ProviderAddress}} [Address] (collectively &ldquo;Service Provider&rdquo;) and</p><p><strong>Buyer(s):</strong> {{.BuyerName}} [Name], located at {{.BuyerAddress}} [Address] (collectively &ldquo;Buyer&rdquo;).</p><p>Each Service Provider and Buyer may be referred to individually as a &ldquo;Party&rdquo; and collectively as the &ldquo;Parties.&rdquo;</p><p class=\"section-title\">1. Services.</p><p>Service Provider agrees to provide and Buyer agrees to purchase the following services:</p><table><tr><th>Description of Services</th><th>Number of Projects</th><th>Price per Project</th></tr>{{range .Services}}<tr><td>{{index . \"Description\"}}</td><td style=\"text-align:center;\">{{index . \"NumProjects\"}}</td><td style=\"text-align:right;\">${{index . \"PricePerPrj\"}}</td></tr>{{end}}</table><p class=\"section-title\">2. Purchase Price.</p><p>Buyer will pay to Service Provider the full and complete purchase price, the sum of <strong>${{.PurchasePrice}}</strong>.</p><p>Unless otherwise stated: <span class=\"checkbox\"></span> Service Provider <span class=\"checkbox\"></span> Buyer shall be responsible for all taxes in connection with the purchase of Services.</p><p class=\"section-title\">3. Payment.</p><div class=\"two-col\"><div class=\"col\"><p><span class=\"checkbox\"></span> Cash</p><p><span class=\"checkbox\"></span> Personal check</p><p><span class=\"checkbox\"></span> Cashier&rsquo;s check</p><p><span class=\"checkbox\"></span> Money order</p></div><div class=\"col\"><p><span class=\"checkbox\"></span> Credit / debit card</p><p><span class=\"checkbox\"></span> Wire transfer</p><p><span class=\"checkbox\"></span> Other: <span class=\"line\" style=\"width:140px;\"></span></p></div></div>{{if .Notes}}<div class=\"notes-box\">{{.Notes}}</div>{{end}}</div><div class=\"page-break\"></div><div class=\"page\"><p>By this contract, <strong>{{.Payer}}</strong> agrees to make payments to <strong>{{.Payee}}</strong>, hereafter known as &ldquo;Lender,&rdquo; by the following schedule in exchange for <em>{{.Product}}</em>. This payment schedule is enforceable by law, and the methods described below will be used in cases of delinquent payment.</p><p>By this agreement, it is agreed that a payment of <strong>{{.AmountPerPeriod}}</strong> will be surrendered to the Lender every <strong>{{.Interval}}</strong> until the total of the payment required, which is <strong>{{.TotalAmount}}</strong>, has been delivered. The payment plan will take the following form:</p><ul>{{range .Payments}}<li>{{index . \"Date\"}} &mdash; {{index . \"Amount\"}}</li>{{end}}</ul><p>These payments include any interest and other charges that may apply.</p><p>This agreement is binding, and failure to meet its terms will allow the Lender to take certain recourse. First, late payments will incur a fee of <strong>{{.LateFee}}</strong> every <strong>{{.Interval}}</strong>. Insufficient payment and bounced checks will incur a fee of <strong>{{.BounceFee}}</strong>. If payment should not be delivered at all, Lender will be entitled to <em>{{.LenderAction}}</em>.</p><p>In addition, the following terms and conditions apply: <em>{{.TermsConditions}}</em>.</p><p>By signing this agreement, all parties agree to the terms as described above. Alterations to this agreement can only be made by both parties and must be placed in writing. Both parties will receive a printed copy of this agreement, and will be responsible for upholding its terms.</p><div class=\"signature\"><div class=\"signature-row\"><div class=\"sig-box\"><div class=\"sig-line\"></div>({{.Payer}} &mdash; Payer)</div><div class=\"sig-box\"><div class=\"sig-line\"></div>(Date)</div></div><div class=\"signature-row\"><div class=\"sig-box\"><div class=\"sig-line\"></div>({{.Payee}} &mdash; Payee)</div><div class=\"sig-box\"><div class=\"sig-line\"></div>(Date)</div></div></div></div></body></html>",
-  "data": {
-    "State": "California",
-    "Day": "8",
-    "Month": "May",
-    "Year": "26",
-    "ProviderName": "Acme Solutions Inc.",
-    "ProviderAddress": "123 Market Street, San Francisco, CA 94105",
-    "BuyerName": "John Doe",
-    "BuyerAddress": "456 Oak Avenue, Los Angeles, CA 90001",
-    "PurchasePrice": "7,500.00",
-    "Notes": "All work to be completed within 90 days of agreement signing. Remote delivery unless otherwise agreed.",
-    "Payer": "John Doe",
-    "Payee": "Acme Solutions Inc.",
-    "Product": "Web Development and Design Services",
-    "AmountPerPeriod": "$2,500.00",
-    "Interval": "month",
-    "TotalAmount": "$7,500.00",
-    "LateFee": "$75.00",
-    "BounceFee": "$50.00",
-    "LenderAction": "pursue full legal remedies including collection and court proceedings",
-    "TermsConditions": "This agreement is governed by the laws of the State of California. Any disputes shall be resolved through binding arbitration in San Francisco County.",
-    "Services": [
-      {
-        "Description": "UI/UX Design",
-        "NumProjects": 3,
-        "PricePerPrj": "1,000.00"
-      },
-      {
-        "Description": "Frontend Development",
-        "NumProjects": 2,
-        "PricePerPrj": "2,000.00"
-      },
-      {
-        "Description": "Backend API Integration",
-        "NumProjects": 1,
-        "PricePerPrj": "1,500.00"
-      }
-    ],
-    "Payments": [
-      { "Date": "2026-06-01", "Amount": "$2,500.00" },
-      { "Date": "2026-07-01", "Amount": "$2,500.00" },
-      { "Date": "2026-08-01", "Amount": "$2,500.00" }
-    ]
-  }
+package pdfgen
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/labstack/echo/v4"
+)
+
+type RequestBody struct {
+	HTML         string `json:"html"`
+	Filename     string `json:"filename"`
+	Size         string `json:"size"`
+	CustomWidth  string `json:"custom_width"`
+	CustomHeight string `json:"custom_height"`
+}
+
+type PageSize struct {
+	Width  string
+	Height string
+}
+
+var ValidSizes = map[string]PageSize{
+	"A4":     {Width: "8.27in", Height: "11.69in"},
+	"Letter": {Width: "8.5in", Height: "11in"},
+	"Legal":  {Width: "8.5in", Height: "14in"},
+}
+
+func ValidateDimension(value, field string) error {
+	if value == "" {
+		return fmt.Errorf("%s is required when using custom size", field)
+	}
+	if !strings.HasSuffix(value, "in") {
+		return fmt.Errorf("%s '%s' is invalid\nvalid format: e.g. 6, 8.5", field, value)
+	}
+	numberPart := strings.TrimSuffix(value, "in")
+	if _, err := strconv.ParseFloat(numberPart, 64); err != nil {
+		return fmt.Errorf("%s '%s' is invalid\nvalid format: e.g. 6, 8.5", field, value)
+	}
+	return nil
+}
+
+func normalizeToInches(value string) string {
+	return value + "in"
+}
+
+func ValidateSize(size, customWidth, customHeight string) (PageSize, error) {
+	if customWidth != "" || customHeight != "" {
+		if size != "" {
+			return PageSize{}, fmt.Errorf("size and custom_width/custom_height are mutually exclusive")
+		}
+		if err := ValidateDimension(customWidth, "custom_width"); err != nil {
+			return PageSize{}, err
+		}
+		if err := ValidateDimension(customHeight, "custom_height"); err != nil {
+			return PageSize{}, err
+		}
+		return PageSize{
+			Width:  normalizeToInches(customWidth),
+			Height: normalizeToInches(customHeight),
+		}, nil
+	}
+
+	if size == "" {
+		size = "A4"
+	}
+	ps, ok := ValidSizes[size]
+	if !ok {
+		var lines []string
+		for name, dims := range ValidSizes {
+			lines = append(lines, fmt.Sprintf("  %s  width - %s  height - %s", name, dims.Width, dims.Height))
+		}
+		sort.Strings(lines)
+		return PageSize{}, fmt.Errorf(
+			"the size '%s' is invalid\nvalid formats:\n%s\nor provide custom_width and custom_height instead",
+			size, strings.Join(lines, "\n"),
+		)
+	}
+	return ps, nil
+}
+
+func GenerateHandler(c echo.Context) error {
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	var req RequestBody
+	if err := json.Unmarshal(body, &req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
+	}
+
+	if req.HTML == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "html field is required"})
+	}
+	if req.Filename == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "filename field is required"})
+	}
+	if len(req.Filename) > 50 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "filename must be 50 characters or less"})
+	}
+
+	if err := ValidateBody(req.HTML); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	filename, err := SanitizeFilename(req.Filename)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	pageSize, err := ValidateSize(req.Size, req.CustomWidth, req.CustomHeight)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	slog.Info("pdf request", "filename", filename, "html_length", len(req.HTML), "page_size", pageSize)
+
+	path, err := GenerateNamed(req.HTML, filename, pageSize)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.Attachment(path, filename)
 }
