@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/labstack/echo/v4"
 )
@@ -22,59 +21,56 @@ type RequestBody struct {
 }
 
 type PageSize struct {
-	Width  string
-	Height string
+	Width  float64
+	Height float64
 }
 
-var ValidSizes = map[string]PageSize{
-	"A4":     {Width: "8.27in", Height: "11.69in"},
-	"Letter": {Width: "8.5in", Height: "11in"},
-	"Legal":  {Width: "8.5in", Height: "14in"},
+var validSizes = map[string]PageSize{
+	"A4":     {Width: 8.27, Height: 11.69},
+	"Letter": {Width: 8.5, Height: 11},
+	"Legal":  {Width: 8.5, Height: 14},
 }
 
-func ValidateDimension(value, field string) error {
+var defaultSize = validSizes["A4"]
+
+func parseDimension(value, field string) (float64, error) {
 	if value == "" {
-		return fmt.Errorf("%s is required when using custom size", field)
+		return 0, fmt.Errorf("%s is required when using custom size", field)
 	}
-	if !strings.HasSuffix(value, "in") {
-		return fmt.Errorf("%s '%s' is invalid\nvalid format: e.g. 6, 8.5", field, value)
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil || f <= 0 {
+		return 0, fmt.Errorf("%s '%s' is invalid — must be a positive number, e.g. 6, 8.5", field, value)
 	}
-	numberPart := strings.TrimSuffix(value, "in")
-	if _, err := strconv.ParseFloat(numberPart, 64); err != nil {
-		return fmt.Errorf("%s '%s' is invalid\nvalid format: e.g. 6, 8.5", field, value)
-	}
-	return nil
+	return f, nil
 }
 
-func normalizeToInches(value string) string {
-	return value + "in"
-}
+func validateSize(size, customWidth, customHeight string) (PageSize, error) {
+	usingCustom := customWidth != "" || customHeight != ""
 
-func ValidateSize(size, customWidth, customHeight string) (PageSize, error) {
-	if customWidth != "" || customHeight != "" {
+	if usingCustom {
 		if size != "" {
 			return PageSize{}, fmt.Errorf("size and custom_width/custom_height are mutually exclusive")
 		}
-		if err := ValidateDimension(customWidth, "custom_width"); err != nil {
+		w, err := parseDimension(customWidth, "custom_width")
+		if err != nil {
 			return PageSize{}, err
 		}
-		if err := ValidateDimension(customHeight, "custom_height"); err != nil {
+		h, err := parseDimension(customHeight, "custom_height")
+		if err != nil {
 			return PageSize{}, err
 		}
-		return PageSize{
-			Width:  normalizeToInches(customWidth),
-			Height: normalizeToInches(customHeight),
-		}, nil
+		return PageSize{Width: w, Height: h}, nil
 	}
 
 	if size == "" {
-		size = "A4"
+		return defaultSize, nil
 	}
-	ps, ok := ValidSizes[size]
+
+	ps, ok := validSizes[size]
 	if !ok {
 		var lines []string
-		for name, dims := range ValidSizes {
-			lines = append(lines, fmt.Sprintf("  %s  width - %s  height - %s", name, dims.Width, dims.Height))
+		for name, dims := range validSizes {
+			lines = append(lines, fmt.Sprintf("  %s  width - %.2f  height - %.2f", name, dims.Width, dims.Height))
 		}
 		sort.Strings(lines)
 		return PageSize{}, fmt.Errorf(
@@ -115,14 +111,14 @@ func GenerateHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	pageSize, err := ValidateSize(req.Size, req.CustomWidth, req.CustomHeight)
+	pageSize, err := validateSize(req.Size, req.CustomWidth, req.CustomHeight)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
 	slog.Info("pdf request", "filename", filename, "html_length", len(req.HTML), "page_size", pageSize)
 
-	path, err := GenerateNamed(req.HTML, filename, pageSize)
+	path, err := GenerateNamed(req.HTML, filename, pageSize.Width, pageSize.Height)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
