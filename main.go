@@ -10,7 +10,7 @@ import (
 	"github.com/yeqown/go-qrcode/writer/standard"
 )
 
-// CreateQRWithLogo generates a QR code with an optional logo overlay.
+// CreateQRWithLogo generates a QR code using the WithLogo option.
 func CreateQRWithLogo(content string) {
 	qr, err := qrcode.New(content)
 	if err != nil {
@@ -49,7 +49,6 @@ func UrlGet(url string) error {
 		return err
 	}
 
-	// Pretend to be a browser
 	req.Header.Set("User-Agent",
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36")
 
