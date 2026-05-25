@@ -1,51 +1,74 @@
-package main
+package chromedp
 
 import (
-	"log/slog"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	"github.com/karkki-hub/chromedp_pdfgen/chromedp"
+	"github.com/yeqown/go-qrcode/v2"
+	"github.com/yeqown/go-qrcode/writer/standard"
 )
 
-func main() {
-	e := echo.New()
-	e.Use(middleware.Recover())
-	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogStatus:    true,
-		LogURI:       true,
-		LogMethod:    true,
-		LogLatency:   true,
-		LogRequestID: true,
-		LogError:     true,
-		HandleError:  true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			level := slog.LevelInfo
-			if v.Error != nil || v.Status >= 500 {
-				level = slog.LevelError
-			} else if v.Status >= 400 {
-				level = slog.LevelWarn
-			}
-			slog.Log(c.Request().Context(), level, "request",
-				"method", v.Method,
-				"uri", v.URI,
-				"status", v.Status,
-				"latency", v.Latency,
-				"request_id", v.RequestID,
-				"error", v.Error,
-			)
-			return nil
-		},
-	}))
-
-	e.Static("/", "UI")
-	e.POST("/v1/generatepdf", chromedp.GenerateHandler)
-	e.GET("/health", chromedp.HealthHandler)
-
-	if err := e.Start(":8080"); err != nil && err != http.ErrServerClosed {
-		slog.Error("shutting down server", "error", err)
-		os.Exit(1)
+// CreateQRWithLogo generates a QR code with an optional logo overlay.
+func CreateQRWithLogo(content string) {
+	qr, err := qrcode.New(content)
+	if err != nil {
+		fmt.Printf("create qrcode failed: %v\n", err)
+		return
 	}
+
+	getLogoURL := "https://localhost:8080/fetchlogo"
+	if err := UrlGet(getLogoURL); err != nil {
+		fmt.Printf("failed to fetch logo: %v\n", err)
+		return
+	}
+
+	options := []standard.ImageOption{
+		standard.WithLogoImageFileJPEG("logo.jpg"),
+		standard.WithQRWidth(70),
+	}
+
+	writer, err := standard.New("qrcode_with_logo.png", options...)
+	if err != nil {
+		fmt.Printf("create writer failed: %v\n", err)
+		return
+	}
+	defer writer.Close()
+
+	if err = qr.Save(writer); err != nil {
+		fmt.Printf("save qrcode failed: %v\n", err)
+	}
+}
+
+func UrlGet(url string) error {
+	client := &http.Client{}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	// Pretend to be a browser
+	req.Header.Set("User-Agent",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	outfile, err := os.Create("logo.jpg")
+	if err != nil {
+		return err
+	}
+	defer outfile.Close()
+
+	_, err = io.Copy(outfile, resp.Body)
+	return err
 }
