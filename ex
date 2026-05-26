@@ -15,7 +15,8 @@ import (
 )
 
 // CreateQRWithLogo generates a QR code using the WithLogo option.
-// The QR width is calculated based on the logo size, then the final image is resized to dimensionxdimension.
+// The QR width is calculated based on the logo size and actual QR version,
+// then the final image is resized to dimensionxdimension.
 func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 	fmt.Printf("Creating QR code with content: %s, logoURL: %s, dimension: %d\n",
 		content, logoURL, dimension)
@@ -34,7 +35,7 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 			return err
 		}
 
-		qrWidth, err := qrWidthFromLogo("logo1.jpg")
+		qrWidth, err := qrWidthFromLogo("logo1.jpg", qr)
 		if err != nil {
 			fmt.Printf("failed to derive QR width from logo: %v\n", err)
 			return err
@@ -74,8 +75,13 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 }
 
 // qrWidthFromLogo reads the logo file and calculates an appropriate QR module
-// width so the logo occupies roughly 20% of the total QR area.
-func qrWidthFromLogo(logoPath string) (uint8, error) {
+// width so the logo occupies roughly 1/5 (20%) of the total QR side length,
+// based on the actual QR version's module count.
+//
+// modules = (version-1)*4 + 21
+// totalSide = logoSide * 5
+// qrWidth = totalSide / modules
+func qrWidthFromLogo(logoPath string, qr *qrcode.QRCode) (uint8, error) {
 	f, err := os.Open(logoPath)
 	if err != nil {
 		return 0, err
@@ -92,18 +98,27 @@ func qrWidthFromLogo(logoPath string) (uint8, error) {
 		logoSide = cfg.Height
 	}
 
-	// 21 modules * 0.20 logo ratio = 4.2
-	qrWidth := int(float64(logoSide) / 4.2)
+	// Derive actual module count from the QR version
+	version := qr.Version()
+	modules := (version-1)*4 + 21
+
+	// totalSide = logoSide * 5  →  qrWidth = totalSide / modules
+	qrWidth := int(float64(logoSide*5) / float64(modules))
 	if qrWidth < 1 {
 		qrWidth = 1
 	}
 	if qrWidth > 255 {
 		qrWidth = 255
 	}
+
+	fmt.Printf("Logo side: %dpx, QR version: %d, modules: %d → QR module width: %d (total QR ~%dpx)\n",
+		logoSide, version, modules, qrWidth, qrWidth*modules)
+
 	return uint8(qrWidth), nil
 }
 
-// resizeImage reads any supported image at path, resizes it to size×size, and overwrites the file as PNG.
+// resizeImage reads any supported image at path, resizes it to size×size,
+// and overwrites the file as PNG.
 func resizeImage(path string, size int) error {
 	f, err := os.Open(path)
 	if err != nil {
