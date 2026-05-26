@@ -3,7 +3,7 @@ package chromedp
 import (
 	"fmt"
 	"image"
-	_ "image/jpeg"
+	"image/jpeg"
 	"image/png"
 	"io"
 	"net/http"
@@ -15,7 +15,7 @@ import (
 )
 
 // CreateQRWithLogo generates a QR code using the WithLogo option.
-// The QR width is calculated based on the logo size and actual QR version,
+// The logo is pre-resized to exactly 1/5 of the expected QR canvas size,
 // then the final image is resized to dimensionxdimension.
 func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 	fmt.Printf("Creating QR code with content: %s, logoURL: %s, dimension: %d\n",
@@ -35,12 +35,20 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 			return err
 		}
 
-		qrWidth, err := qrWidthFromLogo("logo1.jpg", content)
-		if err != nil {
-			fmt.Printf("failed to derive QR width from logo: %v\n", err)
+		// Calculate expected QR canvas size and resize logo to exactly 1/5 of it
+		version := qrVersionFromContent(content)
+		modules := (version-1)*4 + 21
+		qrWidth := uint8(10)
+		expectedQRSize := int(qrWidth) * modules
+		targetLogoSize := expectedQRSize / 5
+
+		fmt.Printf("QR version: %d, modules: %d, expected QR size: %dpx, target logo size: %dpx\n",
+			version, modules, expectedQRSize, targetLogoSize)
+
+		if err = resizeLogoToTarget("logo1.jpg", targetLogoSize); err != nil {
+			fmt.Printf("failed to resize logo: %v\n", err)
 			return err
 		}
-		fmt.Printf("Derived QR width from logo: %d\n", qrWidth)
 
 		options = []standard.ImageOption{
 			standard.WithLogoImageFileJPEG("logo1.jpg"),
@@ -96,47 +104,29 @@ func qrVersionFromContent(content string) int {
 	return 40 // max version
 }
 
-// qrWidthFromLogo reads the logo file and calculates an appropriate QR module
-// width so the logo occupies roughly 1/5 (20%) of the total QR side length,
-// based on the actual QR version's module count.
-//
-// modules = (version-1)*4 + 21
-// totalSide = logoSide * 5
-// qrWidth = totalSide / modules
-func qrWidthFromLogo(logoPath string, content string) (uint8, error) {
-	f, err := os.Open(logoPath)
+// resizeLogoToTarget resizes the logo at path to targetSize x targetSize in place.
+func resizeLogoToTarget(path string, targetSize int) error {
+	f, err := os.Open(path)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	defer f.Close()
 
-	cfg, _, err := image.DecodeConfig(f)
+	img, _, err := image.Decode(f)
+	f.Close()
 	if err != nil {
-		return 0, fmt.Errorf("decode logo config: %w", err)
+		return fmt.Errorf("decode logo: %w", err)
 	}
 
-	logoSide := cfg.Width
-	if cfg.Height > logoSide {
-		logoSide = cfg.Height
+	resized := resize.Resize(uint(targetSize), uint(targetSize), img, resize.Lanczos3)
+
+	out, err := os.Create(path)
+	if err != nil {
+		return err
 	}
+	defer out.Close()
 
-	// Derive actual module count from the estimated QR version
-	version := qrVersionFromContent(content)
-	modules := (version-1)*4 + 21
-
-	// totalSide = logoSide * 5  →  qrWidth = totalSide / modules
-	qrWidth := int(float64(logoSide*5) / float64(modules))
-	if qrWidth < 1 {
-		qrWidth = 1
-	}
-	if qrWidth > 255 {
-		qrWidth = 255
-	}
-
-	fmt.Printf("Logo side: %dpx, QR version: %d, modules: %d → QR module width: %d (total QR ~%dpx)\n",
-		logoSide, version, modules, qrWidth, qrWidth*modules)
-
-	return uint8(qrWidth), nil
+	fmt.Printf("Resized logo to %dx%d\n", targetSize, targetSize)
+	return jpeg.Encode(out, resized, &jpeg.Options{Quality: 95})
 }
 
 // resizeImage reads any supported image at path, resizes it to size×size,
