@@ -3,7 +3,7 @@ package chromedp
 import (
 	"fmt"
 	"image"
-	"image/jpeg"
+	_ "image/jpeg"
 	"image/png"
 	"io"
 	"net/http"
@@ -34,7 +34,6 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 			return err
 		}
 
-		// Derive QR module width from logo's actual pixel dimensions
 		qrWidth, err := qrWidthFromLogo("logo1.jpg")
 		if err != nil {
 			fmt.Printf("failed to derive QR width from logo: %v\n", err)
@@ -48,7 +47,6 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 			standard.WithBorderWidth(0),
 		}
 	} else {
-		// Fallback: no logo, use a sensible default module size
 		options = []standard.ImageOption{
 			standard.WithQRWidth(10),
 			standard.WithBorderWidth(0),
@@ -66,9 +64,7 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 		fmt.Printf("save qrcode failed: %v\n", err)
 		return err
 	}
-	writer.Close() // flush before we read the file back
 
-	// Resize the generated QR image to exactly dimensionxdimension
 	if err = resizeImage("qrcode_with_logo.png", dimension); err != nil {
 		fmt.Printf("resize failed: %v\n", err)
 		return err
@@ -77,12 +73,8 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 	return nil
 }
 
-// qrWidthFromLogo reads the logo file, calculates an appropriate QR module
+// qrWidthFromLogo reads the logo file and calculates an appropriate QR module
 // width so the logo occupies roughly 20% of the total QR area.
-//
-// QR total side ≈ 21 modules × qrWidth  (version-1 baseline)
-// Logo should fill ~20% → logoSide ≈ 0.20 × totalSide
-//   → qrWidth = logoSide / (21 × 0.20) = logoSide / 4.2
 func qrWidthFromLogo(logoPath string) (uint8, error) {
 	f, err := os.Open(logoPath)
 	if err != nil {
@@ -95,13 +87,12 @@ func qrWidthFromLogo(logoPath string) (uint8, error) {
 		return 0, fmt.Errorf("decode logo config: %w", err)
 	}
 
-	// Use the larger dimension so portrait/landscape logos both fit
 	logoSide := cfg.Width
 	if cfg.Height > logoSide {
 		logoSide = cfg.Height
 	}
 
-	// 21 modules * 0.20 logo ratio = 4.2 → round to nearest int, clamp to [1,255]
+	// 21 modules * 0.20 logo ratio = 4.2
 	qrWidth := int(float64(logoSide) / 4.2)
 	if qrWidth < 1 {
 		qrWidth = 1
@@ -112,17 +103,17 @@ func qrWidthFromLogo(logoPath string) (uint8, error) {
 	return uint8(qrWidth), nil
 }
 
-// resizeImage reads a PNG at path, resizes it to size×size, and overwrites the file.
+// resizeImage reads any supported image at path, resizes it to size×size, and overwrites the file as PNG.
 func resizeImage(path string, size int) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 
-	img, err := png.Decode(f)
+	img, format, err := image.Decode(f)
 	f.Close()
 	if err != nil {
-		return fmt.Errorf("decode png: %w", err)
+		return fmt.Errorf("decode image (format=%s): %w", format, err)
 	}
 
 	resized := resize.Resize(uint(size), uint(size), img, resize.Lanczos3)
