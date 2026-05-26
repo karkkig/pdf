@@ -35,7 +35,7 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 			return err
 		}
 
-		qrWidth, err := qrWidthFromLogo("logo1.jpg", qr)
+		qrWidth, err := qrWidthFromLogo("logo1.jpg", content)
 		if err != nil {
 			fmt.Printf("failed to derive QR width from logo: %v\n", err)
 			return err
@@ -74,6 +74,28 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 	return nil
 }
 
+// qrVersionFromContent estimates the minimum QR version needed for the given
+// content at Medium error correction level (the library's default).
+// Based on ISO 18004 capacity tables for byte encoding at level M.
+func qrVersionFromContent(content string) int {
+	contentLen := len(content)
+
+	// ISO 18004 byte-mode capacity at error correction level M
+	capacities := []int{
+		14, 26, 42, 62, 84, 106, 122, 154, 180, 213, // v1-10
+		251, 287, 331, 370, 411, 461, 512, 549, 597, 648, // v11-20
+		702, 742, 823, 875, 916, 1000, 1062, 1128, 1193, 1267, // v21-30
+		1373, 1455, 1541, 1631, 1725, 1812, 1914, 1992, 2102, 2216, // v31-40
+	}
+
+	for version, capacity := range capacities {
+		if contentLen <= capacity {
+			return version + 1 // versions are 1-indexed
+		}
+	}
+	return 40 // max version
+}
+
 // qrWidthFromLogo reads the logo file and calculates an appropriate QR module
 // width so the logo occupies roughly 1/5 (20%) of the total QR side length,
 // based on the actual QR version's module count.
@@ -81,7 +103,7 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 // modules = (version-1)*4 + 21
 // totalSide = logoSide * 5
 // qrWidth = totalSide / modules
-func qrWidthFromLogo(logoPath string, qr *qrcode.QRCode) (uint8, error) {
+func qrWidthFromLogo(logoPath string, content string) (uint8, error) {
 	f, err := os.Open(logoPath)
 	if err != nil {
 		return 0, err
@@ -98,8 +120,8 @@ func qrWidthFromLogo(logoPath string, qr *qrcode.QRCode) (uint8, error) {
 		logoSide = cfg.Height
 	}
 
-	// Derive actual module count from the QR version
-	version := qr.Version()
+	// Derive actual module count from the estimated QR version
+	version := qrVersionFromContent(content)
 	modules := (version-1)*4 + 21
 
 	// totalSide = logoSide * 5  →  qrWidth = totalSide / modules
