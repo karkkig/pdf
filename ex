@@ -2,6 +2,10 @@ package chromedp
 
 import (
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"io"
 	"net/http"
 	"os"
@@ -10,17 +14,14 @@ import (
 )
 
 // CreateQRWithLogo generates a QR code using the ahmedtahas/qr-gode library.
-// Outputs a PNG file named "qrcode_with_logo.png".
-// The logo (if provided) is auto-sized to 15-30% of the QR canvas by the library.
-// The border parameter maps to the quiet zone (margin) in modules.
-func CreateQRWithLogo(content string, logoURL string, dimension int, border uint) error {
-	fmt.Printf("Creating QR code with content: %s, logoURL: %s, dimension: %d, border: %d\n",
-		content, logoURL, dimension, border)
+// Outputs a PNG file named "qrcode_with_logo.png" with a white background.
+func CreateQRWithLogo(content string, logoURL string, dimension int) error {
+	fmt.Printf("Creating QR code with content: %s, logoURL: %s, dimension: %d\n",
+		content, logoURL, dimension)
 
 	builder := qrgode.New(content).
 		Size(dimension).
-		QuietZone(int(border)).
-		ErrorCorrection(qrgode.LevelH) // LevelH recommended when a logo is present
+		ErrorCorrection(qrgode.LevelH)
 
 	if logoURL != "" {
 		if err := UrlGet(logoURL); err != nil {
@@ -28,21 +29,66 @@ func CreateQRWithLogo(content string, logoURL string, dimension int, border uint
 			return err
 		}
 
-		// Warn if the logo + ECL combination risks unscannability
-		for _, w := range builder.Logo("logo1.jpg").ScannabilityWarnings() {
+		builder = builder.Logo("logo1.jpg")
+
+		for _, w := range builder.ScannabilityWarnings() {
 			fmt.Printf("scannability warning: %s\n", w)
 		}
-
-		builder = builder.Logo("logo1.jpg")
 	}
 
-	if err := builder.SaveAs("qrcode_with_logo.png"); err != nil {
+	// Get PNG bytes from the library
+	pngBytes, err := builder.PNG()
+	if err != nil {
+		fmt.Printf("generate qrcode failed: %v\n", err)
+		return err
+	}
+
+	// Decode the generated PNG
+	qrImg, err := png.Decode(bytesReader(pngBytes))
+	if err != nil {
+		fmt.Printf("decode qrcode failed: %v\n", err)
+		return err
+	}
+
+	// Composite onto a white canvas
+	bounds := qrImg.Bounds()
+	white := image.NewRGBA(bounds)
+	draw.Draw(white, bounds, &image.Uniform{color.White}, image.Point{}, draw.Src)
+	draw.Draw(white, bounds, qrImg, image.Point{}, draw.Over)
+
+	// Save to file
+	out, err := os.Create("qrcode_with_logo.png")
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if err = png.Encode(out, white); err != nil {
 		fmt.Printf("save qrcode failed: %v\n", err)
 		return err
 	}
 
 	fmt.Println("QR code saved to qrcode_with_logo.png")
 	return nil
+}
+
+// bytesReader wraps a byte slice as an io.Reader.
+func bytesReader(b []byte) io.Reader {
+	return &bytesReaderImpl{b: b, pos: 0}
+}
+
+type bytesReaderImpl struct {
+	b   []byte
+	pos int
+}
+
+func (r *bytesReaderImpl) Read(p []byte) (n int, err error) {
+	if r.pos >= len(r.b) {
+		return 0, io.EOF
+	}
+	n = copy(p, r.b[r.pos:])
+	r.pos += n
+	return n, nil
 }
 
 // UrlGet downloads the resource at url and saves it as logo1.jpg.
