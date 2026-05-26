@@ -1,9 +1,6 @@
-// CreateQRWithLogo generates a QR code using the WithLogo option.
-// The QR is generated at native resolution based on dimension, logo is
-// pre-resized to exactly 1/5 of the QR canvas, then saved as dimensionxdimension.
-func CreateQRWithLogo(content string, logoURL string, dimension int) error {
-	fmt.Printf("Creating QR code with content: %s, logoURL: %s, dimension: %d\n",
-		content, logoURL, dimension)
+func CreateQRWithLogo(content string, logoURL string, dimension int, border uint) error {
+	fmt.Printf("Creating QR code with content: %s, logoURL: %s, dimension: %d, border: %d\n",
+		content, logoURL, dimension, border)
 
 	qr, err := qrcode.New(content)
 	if err != nil {
@@ -11,8 +8,6 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 		return err
 	}
 
-	// Derive module width from dimension and actual QR version
-	// so the generated image is already at native resolution
 	version := qrVersionFromContent(content)
 	modules := (version-1)*4 + 21
 	qrWidth := uint8(dimension / modules)
@@ -30,7 +25,6 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 			return err
 		}
 
-		// Pre-resize logo to exactly 1/5 of the native QR canvas size
 		nativeQRSize := int(qrWidth) * modules
 		targetLogoSize := nativeQRSize / 5
 
@@ -44,12 +38,12 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 		options = []standard.ImageOption{
 			standard.WithLogoImageFileJPEG("logo1.jpg"),
 			standard.WithQRWidth(qrWidth),
-			standard.WithBorderWidth(0),
+			standard.WithBorderWidth(border),
 		}
 	} else {
 		options = []standard.ImageOption{
 			standard.WithQRWidth(qrWidth),
-			standard.WithBorderWidth(0),
+			standard.WithBorderWidth(border),
 		}
 	}
 
@@ -65,7 +59,6 @@ func CreateQRWithLogo(content string, logoURL string, dimension int) error {
 		return err
 	}
 
-	// Final resize to exact dimension in case of rounding differences
 	if err = resizeImage("qrcode_with_logo.png", dimension); err != nil {
 		fmt.Printf("resize failed: %v\n", err)
 		return err
